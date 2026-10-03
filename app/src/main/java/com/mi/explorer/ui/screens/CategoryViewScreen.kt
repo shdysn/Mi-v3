@@ -6,9 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,8 +19,10 @@ import com.mi.explorer.data.model.ApkTab
 import com.mi.explorer.data.model.FileCategory
 import com.mi.explorer.data.model.FileItem
 import com.mi.explorer.data.model.SortType
+import com.mi.explorer.data.model.ViewMode
 import com.mi.explorer.data.model.sortFileList
 import com.mi.explorer.ui.components.ChecksumDialog
+import com.mi.explorer.ui.components.MiFileGridItem
 import com.mi.explorer.ui.components.MiFileRow
 import com.mi.explorer.ui.components.MiSortBottomSheet
 import com.mi.explorer.ui.components.OpenFileChooserDialog
@@ -42,6 +42,7 @@ fun CategoryViewScreen(
     var deleteTarget by remember { mutableStateOf<FileItem?>(null) }
     var showCategorySort by remember { mutableStateOf(false) }
     var categorySortType by remember { mutableStateOf(SortType.DATE_NEWEST) }
+    var viewMode by remember { mutableStateOf(ViewMode.LIST) }
 
     val sortedItems = remember(state.items, categorySortType) {
         sortFileList(state.items, categorySortType, foldersOnTop = false)
@@ -70,6 +71,13 @@ fun CategoryViewScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewMode = if (viewMode == ViewMode.LIST) ViewMode.GRID else ViewMode.LIST }) {
+                        Icon(
+                            imageVector = if (viewMode == ViewMode.LIST) Icons.Default.GridView else Icons.Default.ViewList,
+                            contentDescription = "Toggle View Mode",
+                            tint = MiOrange
+                        )
+                    }
                     IconButton(onClick = { showCategorySort = true }) {
                         Icon(Icons.Default.Sort, contentDescription = "Sort", tint = MiOrange)
                     }
@@ -117,6 +125,57 @@ fun CategoryViewScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+            } else if (viewMode == ViewMode.GRID) {
+                val gridColumns = 3
+                val chunked = sortedItems.chunked(gridColumns)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(chunked, key = { row -> "cat_grid_${row.first().path}" }) { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowItems.forEach { item ->
+                                Box(modifier = Modifier.weight(1f)) {
+                                    MiFileGridItem(
+                                        item = item,
+                                        isSelected = false,
+                                        isSelectionMode = false,
+                                        onClick = {
+                                            if (!viewModel.openFileSmart(item, state.items)) {
+                                                openWithTarget = item
+                                            }
+                                        },
+                                        onLongClick = {},
+                                        onToggleSelect = {},
+                                        onMenuAction = { action ->
+                                            when (action) {
+                                                "open" -> {
+                                                    if (!viewModel.openFileSmart(item, state.items)) {
+                                                        openWithTarget = item
+                                                    }
+                                                }
+                                                "open_with" -> openWithTarget = item
+                                                "toggle_favorite" -> viewModel.toggleFavorite(item.file)
+                                                "checksum" -> checksumTarget = item
+                                                "copy" -> viewModel.copySingle(item)
+                                                "cut" -> viewModel.cutSingle(item)
+                                                "delete" -> deleteTarget = item
+                                                else -> {}
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                            repeat(gridColumns - rowItems.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
             } else {

@@ -778,38 +778,61 @@ fun RecentTabContent(
         filteredList.groupBy { it.timeGroup }
     }
 
+    var recentViewMode by remember { mutableStateOf(ViewMode.LIST) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .testTag("recent_tab_list"),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // Filter chips bar
+        // Filter chips bar & View Mode toggle
         item {
-            LazyRow(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(filters) { f ->
-                    val isSelected = f == activeFilter
-                    Surface(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable { onFilterSelected(f) }
-                            .testTag("filter_chip_$f"),
-                        color = if (isSelected) MiOrange else MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        Text(
-                            text = f,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            ),
-                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                        )
+                LazyRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filters) { f ->
+                        val isSelected = f == activeFilter
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable { onFilterSelected(f) }
+                                .testTag("filter_chip_$f"),
+                            color = if (isSelected) MiOrange else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = f,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                            )
+                        }
                     }
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                IconButton(
+                    onClick = {
+                        recentViewMode = if (recentViewMode == ViewMode.LIST) ViewMode.GRID else ViewMode.LIST
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (recentViewMode == ViewMode.LIST) Icons.Default.GridView else Icons.Default.ViewList,
+                        contentDescription = "Toggle View Mode",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
@@ -862,17 +885,47 @@ fun RecentTabContent(
                     )
                 }
 
-                items(files, key = { it.path }) { file ->
-                    MiFileRow(
-                        item = file,
-                        isSelected = false,
-                        isSelectionMode = false,
-                        onClick = { onOpenFile(file) },
-                        onLongClick = {},
-                        onToggleSelect = {},
-                        onMenuAction = { onMenuAction(it, file) },
-                        modifier = Modifier.padding(horizontal = 12.dp)
-                    )
+                if (recentViewMode == ViewMode.GRID) {
+                    val gridColumns = 3
+                    val chunked = files.chunked(gridColumns)
+                    items(chunked, key = { row -> "recent_grid_${row.first().path}" }) { rowItems ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowItems.forEach { file ->
+                                Box(modifier = Modifier.weight(1f)) {
+                                    MiFileGridItem(
+                                        item = file,
+                                        isSelected = false,
+                                        isSelectionMode = false,
+                                        onClick = { onOpenFile(file) },
+                                        onLongClick = {},
+                                        onToggleSelect = {},
+                                        onMenuAction = { onMenuAction(it, file) }
+                                    )
+                                }
+                            }
+                            repeat(gridColumns - rowItems.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                } else {
+                    items(files, key = { it.path }) { file ->
+                        MiFileRow(
+                            item = file,
+                            isSelected = false,
+                            isSelectionMode = false,
+                            onClick = { onOpenFile(file) },
+                            onLongClick = {},
+                            onToggleSelect = {},
+                            onMenuAction = { onMenuAction(it, file) },
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                    }
                 }
             }
         }
@@ -1445,6 +1498,44 @@ fun StorageTabContent(
                                 Text("Show all ${storageState.items.size} items", color = MiOrange)
                             }
                         }
+                    }
+                }
+            }
+        } else if (storageState.viewMode == ViewMode.GRID) {
+            val gridColumns = 3
+            val chunked = storageState.displayItems.chunked(gridColumns)
+            items(chunked, key = { row -> "storage_grid_${row.first().path}" }) { rowItems ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    rowItems.forEach { item ->
+                        val isSelected = storageState.selectedItems.contains(item)
+                        val itemTagIds = fileTagsMap[item.path] ?: emptyList()
+                        val itemTags = itemTagIds.mapNotNull { ColorTag.findTag(it) }
+                        Box(modifier = Modifier.weight(1f)) {
+                            MiFileGridItem(
+                                item = item,
+                                isSelected = isSelected,
+                                isSelectionMode = storageState.isSelectionMode,
+                                tags = itemTags,
+                                onClick = {
+                                    if (item.isDirectory) {
+                                        onNavigateTo(item.file)
+                                    } else {
+                                        onOpenFile(item)
+                                    }
+                                },
+                                onLongClick = { onToggleSelect(item) },
+                                onToggleSelect = { onToggleSelect(item) },
+                                onMenuAction = { onMenuAction(it, item) }
+                            )
+                        }
+                    }
+                    repeat(gridColumns - rowItems.size) {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }

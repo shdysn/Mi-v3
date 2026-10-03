@@ -32,6 +32,11 @@ data class MiCategory(
     val isSocial: Boolean = false
 )
 
+/**
+ * Compact, modern 4x2 Category Grid inspired by Xiaomi MIUI / HyperOS and Google Files.
+ * Uses a balanced 4-column layout that cuts vertical screen consumption in half,
+ * allowing immediate visibility of recent files and folder contents.
+ */
 @Composable
 fun CategoryGrid(
     onCategoryClick: (FileCategory, String) -> Unit,
@@ -39,16 +44,18 @@ fun CategoryGrid(
     onSocialClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val items = listOf(
+    val row1 = listOf(
         MiCategory("Images", Icons.Default.Image, Color.White, MiBlue, FileCategory.IMAGE),
         MiCategory("Videos", Icons.Default.Movie, Color.White, MiPurple, FileCategory.VIDEO),
-        MiCategory("Docs", Icons.Default.Description, Color.White, MiYellow, FileCategory.DOCUMENT),
         MiCategory("Music", Icons.Default.Audiotrack, Color.White, MiRed, FileCategory.AUDIO),
+        MiCategory("Docs", Icons.Default.Description, Color.White, MiYellow, FileCategory.DOCUMENT)
+    )
+
+    val row2 = listOf(
         MiCategory("APKs", Icons.Default.Android, Color.White, MiGreen, FileCategory.APK),
         MiCategory("Downloads", Icons.Default.Download, Color.White, MiCyan, null),
-        MiCategory("Social", Icons.Default.Chat, Color.White, Color(0xFF25D366), null, isSocial = true),
-        MiCategory("Archives", Icons.Default.Archive, Color.White, MiAmber, FileCategory.ARCHIVE),
-        MiCategory("Tools", Icons.Default.Widgets, Color.White, Color(0xFF6366F1), null, isTools = true)
+        MiCategory("Archives", Icons.Default.FolderZip, Color.White, MiAmber, FileCategory.ARCHIVE),
+        MiCategory("Social", Icons.Default.Chat, Color.White, Color(0xFF25D366), null, isSocial = true)
     )
 
     Column(
@@ -56,12 +63,12 @@ fun CategoryGrid(
             .fillMaxWidth()
             .testTag("mi_category_grid")
     ) {
-        // Row 1 (Images, Videos, Docs)
+        // Row 1: Images, Videos, Music, Docs
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            items.slice(0..2).forEach { cat ->
+            row1.forEach { cat ->
                 CategoryTile(
                     category = cat,
                     onClick = {
@@ -72,32 +79,14 @@ fun CategoryGrid(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Row 2 (Music, APKs, Downloads)
+        // Row 2: APKs, Downloads, Archives, Social
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            items.slice(3..5).forEach { cat ->
-                CategoryTile(
-                    category = cat,
-                    onClick = {
-                        handleCategoryClick(cat, onToolsClick, onSocialClick, onCategoryClick)
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Row 3 (Social, Archives, Tools)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            items.slice(6..8).forEach { cat ->
+            row2.forEach { cat ->
                 CategoryTile(
                     category = cat,
                     onClick = {
@@ -141,11 +130,11 @@ private fun CategoryTile(
             .testTag("category_tile_${category.title}"),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Signature MIUI Squircle Icon Container
+        // Compact 42dp Squircle Icon Badge
         Box(
             modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .size(44.dp)
+                .clip(RoundedCornerShape(13.dp))
                 .background(category.bgColor),
             contentAlignment = Alignment.Center
         ) {
@@ -153,17 +142,17 @@ private fun CategoryTile(
                 imageVector = category.icon,
                 contentDescription = category.title,
                 tint = category.iconColor,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         Text(
             text = category.title,
-            style = MaterialTheme.typography.bodySmall.copy(
+            style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.Medium,
-                fontSize = 12.sp
+                fontSize = 11.sp
             ),
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1

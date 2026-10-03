@@ -205,128 +205,283 @@ fun MiFileRow(
                 )
             }
 
-            DropdownMenu(
+            FileActionDropdownMenu(
                 expanded = showMenu,
-                onDismissRequest = { showMenu = false }
+                onDismiss = { showMenu = false },
+                item = item,
+                onClick = onClick,
+                onMenuAction = onMenuAction
+            )
+        }
+    }
+}
+
+@Composable
+fun FileActionDropdownMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    item: FileItem,
+    onClick: () -> Unit,
+    onMenuAction: (String) -> Unit
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss
+    ) {
+        DropdownMenuItem(
+            text = { Text("Open") },
+            leadingIcon = { Icon(Icons.Default.OpenInNew, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                onClick()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Favorite") },
+            leadingIcon = { Icon(Icons.Default.StarBorder, contentDescription = null, tint = Color(0xFFF59E0B)) },
+            onClick = {
+                onDismiss()
+                onMenuAction("toggle_favorite")
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Color Tags & Labels") },
+            leadingIcon = { Icon(Icons.Default.Label, contentDescription = null, tint = MiOrange) },
+            onClick = {
+                onDismiss()
+                onMenuAction("tags")
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Fast Share (Wi-Fi P2P)") },
+            leadingIcon = { Icon(Icons.Default.WifiTethering, contentDescription = null, tint = Color(0xFF10B981)) },
+            onClick = {
+                onDismiss()
+                onMenuAction("fast_share")
+            }
+        )
+        if (!item.isDirectory) {
+            DropdownMenuItem(
+                text = { Text("Open with...") },
+                leadingIcon = { Icon(Icons.Default.Apps, contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    onMenuAction("open_with")
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Calculate Checksum") },
+                leadingIcon = { Icon(Icons.Default.Fingerprint, contentDescription = null, tint = MiOrange) },
+                onClick = {
+                    onDismiss()
+                    onMenuAction("checksum")
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Hide in Vault") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MiOrange) },
+                onClick = {
+                    onDismiss()
+                    onMenuAction("vault")
+                }
+            )
+        }
+        DropdownMenuItem(
+            text = { Text("Copy") },
+            leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                onMenuAction("copy")
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Cut") },
+            leadingIcon = { Icon(Icons.Default.ContentCut, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                onMenuAction("cut")
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Rename") },
+            leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                onMenuAction("rename")
+            }
+        )
+        if (item.category == FileCategory.ARCHIVE) {
+            DropdownMenuItem(
+                text = { Text("Extract") },
+                leadingIcon = { Icon(Icons.Default.Unarchive, contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    onMenuAction("unzip")
+                }
+            )
+        } else {
+            DropdownMenuItem(
+                text = { Text("Compress") },
+                leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    onMenuAction("zip")
+                }
+            )
+        }
+        DropdownMenuItem(
+            text = { Text("Details") },
+            leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                onMenuAction("details")
+            }
+        )
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text("Delete", color = Color(0xFFEF4444)) },
+            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF4444)) },
+            onClick = {
+                onDismiss()
+                onMenuAction("delete")
+            }
+        )
+    }
+}
+
+/**
+ * Xiaomi MIUI / HyperOS styled Grid Item for files and folders.
+ * Features a large centered squircle badge with format chips, two-line title,
+ * and quick-access kebab menu, making it ideal for visual browsing.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun MiFileGridItem(
+    item: FileItem,
+    isSelected: Boolean,
+    isSelectionMode: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onToggleSelect: () -> Unit,
+    onMenuAction: (String) -> Unit,
+    tags: List<ColorTag> = emptyList(),
+    modifier: Modifier = Modifier
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .combinedClickable(
+                onClick = { if (isSelectionMode) onToggleSelect() else onClick() },
+                onLongClick = onLongClick
+            )
+            .testTag("mi_file_grid_${item.name}"),
+        color = if (isSelected) MiOrange.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+        tonalElevation = if (isSelected) 3.dp else 1.dp,
+        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, MiOrange) else null
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            // Checkbox on top-left in selection mode
+            if (isSelectionMode) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelect() },
+                    colors = CheckboxDefaults.colors(checkedColor = MiOrange),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .size(24.dp)
+                )
+            }
+
+            // Kebab Menu on top-right
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
+                IconButton(
+                    onClick = { showMenu = true },
+                    modifier = Modifier.size(26.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Menu",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                FileActionDropdownMenu(
+                    expanded = showMenu,
+                    onDismiss = { showMenu = false },
+                    item = item,
+                    onClick = onClick,
+                    onMenuAction = onMenuAction
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = if (isSelectionMode) 14.dp else 6.dp, bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                DropdownMenuItem(
-                    text = { Text("Open") },
-                    leadingIcon = { Icon(Icons.Default.OpenInNew, contentDescription = null) },
-                    onClick = {
-                        showMenu = false
-                        onClick()
-                    }
+                // Centered Squircle Badge with format chip
+                FileIconHelper.FileIconBadge(
+                    item = item,
+                    size = 50.dp,
+                    iconSize = 28.dp,
+                    shape = RoundedCornerShape(16.dp)
                 )
-                DropdownMenuItem(
-                    text = { Text("Favorite") },
-                    leadingIcon = { Icon(Icons.Default.StarBorder, contentDescription = null, tint = Color(0xFFF59E0B)) },
-                    onClick = {
-                        showMenu = false
-                        onMenuAction("toggle_favorite")
-                    }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // File or folder name (up to 2 lines, centered)
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.sp,
+                        lineHeight = 15.sp
+                    ),
+                    maxLines = 2,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 2.dp)
                 )
-                DropdownMenuItem(
-                    text = { Text("Color Tags & Labels") },
-                    leadingIcon = { Icon(Icons.Default.Label, contentDescription = null, tint = MiOrange) },
-                    onClick = {
-                        showMenu = false
-                        onMenuAction("tags")
-                    }
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // File size / item count
+                Text(
+                    text = item.formattedSize,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
                 )
-                DropdownMenuItem(
-                    text = { Text("Fast Share (Wi-Fi P2P)") },
-                    leadingIcon = { Icon(Icons.Default.WifiTethering, contentDescription = null, tint = Color(0xFF10B981)) },
-                    onClick = {
-                        showMenu = false
-                        onMenuAction("fast_share")
-                    }
-                )
-                if (!item.isDirectory) {
-                    DropdownMenuItem(
-                        text = { Text("Open with...") },
-                        leadingIcon = { Icon(Icons.Default.Apps, contentDescription = null) },
-                        onClick = {
-                            showMenu = false
-                            onMenuAction("open_with")
+
+                // Optional color tags dots
+                if (tags.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        tags.take(3).forEach { t ->
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(t.composeColor)
+                            )
                         }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Calculate Checksum") },
-                        leadingIcon = { Icon(Icons.Default.Fingerprint, contentDescription = null, tint = MiOrange) },
-                        onClick = {
-                            showMenu = false
-                            onMenuAction("checksum")
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Hide in Vault") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MiOrange) },
-                        onClick = {
-                            showMenu = false
-                            onMenuAction("vault")
-                        }
-                    )
+                    }
                 }
-                DropdownMenuItem(
-                    text = { Text("Copy") },
-                    leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-                    onClick = {
-                        showMenu = false
-                        onMenuAction("copy")
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Cut") },
-                    leadingIcon = { Icon(Icons.Default.ContentCut, contentDescription = null) },
-                    onClick = {
-                        showMenu = false
-                        onMenuAction("cut")
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Rename") },
-                    leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
-                    onClick = {
-                        showMenu = false
-                        onMenuAction("rename")
-                    }
-                )
-                if (item.category == FileCategory.ARCHIVE) {
-                    DropdownMenuItem(
-                        text = { Text("Extract") },
-                        leadingIcon = { Icon(Icons.Default.Unarchive, contentDescription = null) },
-                        onClick = {
-                            showMenu = false
-                            onMenuAction("unzip")
-                        }
-                    )
-                } else {
-                    DropdownMenuItem(
-                        text = { Text("Compress") },
-                        leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
-                        onClick = {
-                            showMenu = false
-                            onMenuAction("zip")
-                        }
-                    )
-                }
-                DropdownMenuItem(
-                    text = { Text("Details") },
-                    leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
-                    onClick = {
-                        showMenu = false
-                        onMenuAction("details")
-                    }
-                )
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text("Delete", color = Color(0xFFEF4444)) },
-                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF4444)) },
-                    onClick = {
-                        showMenu = false
-                        onMenuAction("delete")
-                    }
-                )
             }
         }
     }
