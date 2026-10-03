@@ -19,6 +19,7 @@ data class ZipEntryItem(
     val lastModified: Long
 ) {
     val formattedSize: String get() = com.mi.explorer.data.model.FileItem.formatBytes(size)
+    val extension: String get() = name.substringAfterLast(".", "").lowercase()
     val ratioPercentage: Int get() {
         if (size <= 0) return 0
         val saved = size - compressedSize

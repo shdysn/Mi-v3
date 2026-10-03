@@ -356,23 +356,19 @@ fun ZipEntryRow(
                 colors = CheckboxDefaults.colors(checkedColor = MiOrange)
             )
 
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        if (entry.isDirectory) Color(0xFFF59E0B).copy(alpha = 0.15f)
-                        else MiOrange.copy(alpha = 0.12f)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (entry.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
-                    contentDescription = null,
-                    tint = if (entry.isDirectory) Color(0xFFF59E0B) else MiOrange,
-                    modifier = Modifier.size(20.dp)
-                )
+            val descriptor = remember(entry.name, entry.isDirectory, entry.extension) {
+                if (entry.isDirectory) {
+                    com.mi.explorer.utils.FileIconHelper.getFolderDescriptor(entry.name)
+                } else {
+                    com.mi.explorer.utils.FileIconHelper.getFileDescriptor(entry.name, entry.extension)
+                }
             }
+            com.mi.explorer.utils.FileIconHelper.FileIconBadge(
+                descriptor = descriptor,
+                size = 38.dp,
+                iconSize = 20.dp,
+                shape = RoundedCornerShape(10.dp)
+            )
 
             Spacer(modifier = Modifier.width(12.dp))
 

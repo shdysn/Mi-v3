@@ -347,20 +347,20 @@ private fun TrashItemRow(
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFEF4444).copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (item.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
-                    contentDescription = null,
-                    tint = Color(0xFFEF4444),
-                    modifier = Modifier.size(22.dp)
-                )
+            val descriptor = remember(item.displayName, item.isDirectory) {
+                if (item.isDirectory) {
+                    com.mi.explorer.utils.FileIconHelper.getFolderDescriptor(item.displayName)
+                } else {
+                    val ext = item.displayName.substringAfterLast(".", "")
+                    com.mi.explorer.utils.FileIconHelper.getFileDescriptor(item.displayName, ext)
+                }
             }
+            com.mi.explorer.utils.FileIconHelper.FileIconBadge(
+                descriptor = descriptor,
+                size = 42.dp,
+                iconSize = 22.dp,
+                shape = RoundedCornerShape(12.dp)
+            )
 
             Spacer(modifier = Modifier.width(12.dp))
 

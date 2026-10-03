@@ -534,26 +534,12 @@ fun VaultItemRow(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MiOrange.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = when (item.category) {
-                        FileCategory.IMAGE -> Icons.Default.Image
-                        FileCategory.VIDEO -> Icons.Default.Movie
-                        FileCategory.AUDIO -> Icons.Default.MusicNote
-                        FileCategory.DOCUMENT -> Icons.Default.Description
-                        else -> Icons.Default.Lock
-                    },
-                    contentDescription = null,
-                    tint = MiOrange,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            com.mi.explorer.utils.FileIconHelper.FileIconBadge(
+                item = item,
+                size = 44.dp,
+                iconSize = 24.dp,
+                shape = RoundedCornerShape(12.dp)
+            )
 
             Spacer(modifier = Modifier.width(12.dp))
 

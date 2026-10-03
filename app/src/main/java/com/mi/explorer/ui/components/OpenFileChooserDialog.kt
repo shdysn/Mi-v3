@@ -85,30 +85,12 @@ fun OpenFileChooserDialog(
                     .padding(bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val icon = when (item.category) {
-                        FileCategory.IMAGE -> Icons.Default.Image
-                        FileCategory.AUDIO -> Icons.Default.MusicNote
-                        FileCategory.VIDEO -> Icons.Default.Movie
-                        FileCategory.DOCUMENT -> Icons.Default.Description
-                        FileCategory.ARCHIVE -> Icons.Default.FolderZip
-                        FileCategory.APK -> Icons.Default.Android
-                        FileCategory.CODE -> Icons.Default.Code
-                        else -> Icons.Default.InsertDriveFile
-                    }
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+                com.mi.explorer.utils.FileIconHelper.FileIconBadge(
+                    item = item,
+                    size = 48.dp,
+                    iconSize = 26.dp,
+                    shape = RoundedCornerShape(14.dp)
+                )
 
                 Spacer(modifier = Modifier.width(14.dp))
 

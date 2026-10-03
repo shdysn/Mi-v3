@@ -263,6 +263,15 @@ fun DuplicateFinderScreen(viewModel: ExplorerViewModel) {
                                         )
                                     }
 
+                                    com.mi.explorer.utils.FileIconHelper.FileIconBadge(
+                                        item = group.original,
+                                        size = 36.dp,
+                                        iconSize = 20.dp,
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.width(10.dp))
+
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = group.original.name,
@@ -299,6 +308,15 @@ fun DuplicateFinderScreen(viewModel: ExplorerViewModel) {
                                             onCheckedChange = { viewModel.toggleSelectDuplicate(dupe) },
                                             colors = CheckboxDefaults.colors(checkedColor = MiOrange)
                                         )
+
+                                        com.mi.explorer.utils.FileIconHelper.FileIconBadge(
+                                            item = dupe,
+                                            size = 34.dp,
+                                            iconSize = 18.dp,
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+
+                                        Spacer(modifier = Modifier.width(10.dp))
 
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
