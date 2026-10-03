@@ -1,7 +1,9 @@
 package com.mi.explorer.utils
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,12 +18,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -431,8 +438,8 @@ object FileIconHelper {
 
     /**
      * Standard MIUI / Material 3 squircle icon badge for a FileItem.
-     * Displays the specific Material Icon with category tint and background,
-     * plus an optional format badge chip (e.g. PDF, XLS, APK, ZIP) when applicable.
+     * Automatically loads and displays real thumbnail previews for Photos, Videos, and APKs,
+     * while showing distinct Material Design 3 icons and format chips for all other files.
      */
     @Composable
     fun FileIconBadge(
@@ -444,13 +451,27 @@ object FileIconHelper {
         showFormatBadge: Boolean = true
     ) {
         val descriptor = getDescriptor(item)
+        val shouldLoadThumbnail = !item.isDirectory && (
+            item.category == FileCategory.IMAGE ||
+            item.category == FileCategory.VIDEO ||
+            item.category == FileCategory.APK
+        )
+
+        val thumbnailBitmap by if (shouldLoadThumbnail) {
+            ThumbnailLoader.rememberThumbnailState(item.file, item.category)
+        } else {
+            remember { mutableStateOf(null) }
+        }
+
         FileIconBadge(
             descriptor = descriptor,
+            thumbnail = thumbnailBitmap,
+            isVideo = item.category == FileCategory.VIDEO,
             modifier = modifier,
             size = size,
             iconSize = iconSize,
             shape = shape,
-            showFormatBadge = showFormatBadge
+            showFormatBadge = showFormatBadge && (item.category != FileCategory.IMAGE || thumbnailBitmap == null)
         )
     }
 
@@ -467,23 +488,41 @@ object FileIconHelper {
         showFormatBadge: Boolean = true
     ) {
         val descriptor = getDescriptor(file)
+        val category = if (file.isDirectory) FileCategory.FOLDER else FileItem(file).category
+        val shouldLoadThumbnail = !file.isDirectory && (
+            category == FileCategory.IMAGE ||
+            category == FileCategory.VIDEO ||
+            category == FileCategory.APK
+        )
+
+        val thumbnailBitmap by if (shouldLoadThumbnail) {
+            ThumbnailLoader.rememberThumbnailState(file, category)
+        } else {
+            remember { mutableStateOf(null) }
+        }
+
         FileIconBadge(
             descriptor = descriptor,
+            thumbnail = thumbnailBitmap,
+            isVideo = category == FileCategory.VIDEO,
             modifier = modifier,
             size = size,
             iconSize = iconSize,
             shape = shape,
-            showFormatBadge = showFormatBadge
+            showFormatBadge = showFormatBadge && (category != FileCategory.IMAGE || thumbnailBitmap == null)
         )
     }
 
     /**
      * Standard MIUI / Material 3 squircle icon badge for a FileIconDescriptor.
+     * Renders either the media thumbnail or the tinted Material icon squircle.
      */
     @Composable
     fun FileIconBadge(
         descriptor: FileIconDescriptor,
         modifier: Modifier = Modifier,
+        thumbnail: android.graphics.Bitmap? = null,
+        isVideo: Boolean = false,
         size: Dp = 44.dp,
         iconSize: Dp = 24.dp,
         shape: Shape = RoundedCornerShape(14.dp),
@@ -493,20 +532,53 @@ object FileIconHelper {
             modifier = modifier.size(size),
             contentAlignment = Alignment.Center
         ) {
-            // Background container with tinted color
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .clip(shape)
-                    .background(descriptor.backgroundColor),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = descriptor.icon,
-                    contentDescription = descriptor.categoryLabel,
-                    tint = descriptor.tintColor,
-                    modifier = Modifier.size(iconSize)
-                )
+            if (thumbnail != null) {
+                // Real Image / Video / APK Thumbnail!
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(shape)
+                ) {
+                    androidx.compose.foundation.Image(
+                        bitmap = thumbnail.asImageBitmap(),
+                        contentDescription = descriptor.categoryLabel,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    // If it's a video, overlay a translucent play indicator
+                    if (isVideo) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.3f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Video",
+                                tint = Color.White,
+                                modifier = Modifier.size(iconSize.coerceAtMost(20.dp))
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Background container with tinted color & Material Icon
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(shape)
+                        .background(descriptor.backgroundColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = descriptor.icon,
+                        contentDescription = descriptor.categoryLabel,
+                        tint = descriptor.tintColor,
+                        modifier = Modifier.size(iconSize)
+                    )
+                }
             }
 
             // Optional miniature format chip badge (e.g. "PDF", "XLS", "APK", "ZIP")
