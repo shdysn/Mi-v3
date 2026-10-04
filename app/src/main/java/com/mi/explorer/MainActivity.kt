@@ -264,6 +264,11 @@ fun MiMainApp(viewModel: ExplorerViewModel) {
                 Screen.NETWORK_DRIVES -> NetworkDrivesScreen(viewModel = viewModel)
                 Screen.FAST_SHARE -> FastShareScreen(viewModel = viewModel)
                 Screen.SOCIAL_HUB -> SocialHubScreen(viewModel = viewModel)
+                Screen.WEB_SHARE -> WebShareScreen(viewModel = viewModel)
+                Screen.FILE_SHREDDER -> FileShredderScreen(viewModel = viewModel)
+                Screen.STATUS_SAVER -> StatusSaverScreen(viewModel = viewModel)
+                Screen.SMART_COLLECTIONS -> SmartCollectionsScreen(viewModel = viewModel)
+                Screen.TIME_MACHINE -> TimeMachineScreen(viewModel = viewModel)
             }
         }
 

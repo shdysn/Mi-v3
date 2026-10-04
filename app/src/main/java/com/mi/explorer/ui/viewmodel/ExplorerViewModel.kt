@@ -16,6 +16,11 @@ import com.mi.explorer.utils.ArchiveHelper
 import com.mi.explorer.utils.XapkInstaller
 import com.mi.explorer.utils.XapkInfo
 import com.mi.explorer.utils.BiometricHelper
+import com.mi.explorer.utils.webshare.WebShareServer
+import com.mi.explorer.utils.webshare.WebShareState
+import com.mi.explorer.utils.shredder.FileShredderHelper
+import com.mi.explorer.utils.shredder.ShredMethod
+import com.mi.explorer.utils.shredder.ShredProgress
 import android.media.MediaPlayer
 import android.media.MediaMetadataRetriever
 import kotlinx.coroutines.Job
@@ -40,7 +45,12 @@ enum class Screen {
     VIDEO_PLAYER,
     NETWORK_DRIVES,
     FAST_SHARE,
-    SOCIAL_HUB
+    SOCIAL_HUB,
+    WEB_SHARE,
+    FILE_SHREDDER,
+    STATUS_SAVER,
+    SMART_COLLECTIONS,
+    TIME_MACHINE
 }
 
 data class PdfViewerState(
@@ -312,6 +322,34 @@ class ExplorerViewModel(application: Application) : AndroidViewModel(application
     // 7. Biometric Vault Unlock
     val isBiometricVaultEnabled = MutableStateFlow(vaultRepository.isBiometricEnabled())
 
+    // 8. Wireless Web Share (HTTP Server)
+    private val webShareServer = WebShareServer(application)
+    private val _webShareState = MutableStateFlow(WebShareState(ipAddress = webShareServer.getLocalIpAddress()))
+    val webShareState: StateFlow<WebShareState> = _webShareState.asStateFlow()
+
+    // 9. Military-Grade File Shredder
+    val shredTargets = MutableStateFlow<List<File>>(emptyList())
+    val isShredding = MutableStateFlow(false)
+    val shredProgress = MutableStateFlow(ShredProgress())
+
+    // 10. WhatsApp / Social Status Saver & Sent Media Cleaner
+    val socialStatusRepository = SocialStatusRepository(application)
+    val activeStatuses = MutableStateFlow<List<StatusMediaItem>>(emptyList())
+    val savedStatuses = MutableStateFlow<List<StatusMediaItem>>(emptyList())
+    val sentMediaSummary = MutableStateFlow(SentMediaSummary(0, 0L, emptyList()))
+    val isStatusLoading = MutableStateFlow(false)
+
+    // 11. Smart Collections / Virtual Folders
+    val smartCollectionsRepository = SmartCollectionsRepository(application)
+    val smartCollections = MutableStateFlow<List<SmartCollection>>(emptyList())
+    val activeCollectionFiles = MutableStateFlow<CollectionWithFiles?>(null)
+    val isCollectionLoading = MutableStateFlow(false)
+
+    // 12. Storage Time Machine / On This Day
+    val timeMachineRepository = TimeMachineRepository()
+    val timeMachineData = MutableStateFlow<TimeMachineData?>(null)
+    val isTimeMachineLoading = MutableStateFlow(false)
+
     init {
         refreshStorage()
         loadDirectory(initialDir)
@@ -321,6 +359,11 @@ class ExplorerViewModel(application: Application) : AndroidViewModel(application
         loadStorageApks()
         loadTags()
         loadStorageVolumes()
+        loadSmartCollections()
+
+        webShareServer.onStateChanged = { state ->
+            _webShareState.value = state
+        }
     }
 
     fun selectTab(tab: MiTab) {
@@ -1910,6 +1953,208 @@ class ExplorerViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    // ==========================================
+    // 8. WIRELESS WEB SHARE METHODS
+    // ==========================================
+
+    fun openWebShare() {
+        if (!_webShareState.value.isRunning) {
+            _webShareState.update { it.copy(ipAddress = webShareServer.getLocalIpAddress()) }
+        }
+        navigateToScreen(Screen.WEB_SHARE)
+    }
+
+    fun toggleWebShare() {
+        if (_webShareState.value.isRunning) {
+            webShareServer.stop()
+            showMessage("Web Share stopped")
+        } else {
+            if (webShareServer.start()) {
+                showMessage("Web Share started! Open in any browser: ${_webShareState.value.serverUrl}")
+            } else {
+                showMessage("Failed to start Web Share server")
+            }
+        }
+    }
+
+    // ==========================================
+    // 9. FILE SHREDDER METHODS
+    // ==========================================
+
+    fun openFileShredder(files: List<File> = emptyList()) {
+        shredTargets.value = files
+        navigateToScreen(Screen.FILE_SHREDDER)
+    }
+
+    fun openFileSelectorForShredder() {
+        val items = _storageState.value.selectedItems.map { it.file }
+        if (items.isNotEmpty()) {
+            shredTargets.value = (shredTargets.value + items).distinctBy { it.absolutePath }
+        } else {
+            val nonDirs = _storageState.value.items.filter { !it.isDirectory }.take(3).map { it.file }
+            shredTargets.value = (shredTargets.value + nonDirs).distinctBy { it.absolutePath }
+            showMessage("Added files from current folder. You can add more!")
+        }
+    }
+
+    fun removeShredTarget(file: File) {
+        shredTargets.value = shredTargets.value.filter { it.absolutePath != file.absolutePath }
+    }
+
+    fun startShredding(method: ShredMethod) {
+        val targets = shredTargets.value
+        if (targets.isEmpty()) return
+
+        viewModelScope.launch {
+            isShredding.value = true
+            shredProgress.value = ShredProgress(totalFiles = targets.size)
+            val result = FileShredderHelper.shredFiles(targets, method) { p ->
+                shredProgress.value = p
+            }
+            isShredding.value = false
+            if (result.isSuccess) {
+                showMessage("Successfully shredded ${result.getOrNull()} file(s) permanently")
+                shredTargets.value = emptyList()
+                refreshCurrentDirectory()
+                refreshStorage()
+            } else {
+                showMessage("Shredding error: ${result.exceptionOrNull()?.message}")
+            }
+        }
+    }
+
+    // ==========================================
+    // 10. SOCIAL & STATUS SAVER METHODS
+    // ==========================================
+
+    fun openStatusSaver() {
+        navigateToScreen(Screen.STATUS_SAVER)
+        refreshStatuses()
+    }
+
+    fun refreshStatuses() {
+        viewModelScope.launch {
+            isStatusLoading.value = true
+            activeStatuses.value = socialStatusRepository.getActiveStatuses()
+            savedStatuses.value = socialStatusRepository.getSavedStatuses()
+            sentMediaSummary.value = socialStatusRepository.scanSentMedia()
+            isStatusLoading.value = false
+        }
+    }
+
+    fun saveStatusItem(file: File) {
+        viewModelScope.launch {
+            val result = socialStatusRepository.saveStatusToGallery(file)
+            if (result.isSuccess) {
+                showMessage("Status saved to Pictures/StatusSaver & Gallery!")
+                savedStatuses.value = socialStatusRepository.getSavedStatuses()
+            } else {
+                showMessage("Failed to save status: ${result.exceptionOrNull()?.message}")
+            }
+        }
+    }
+
+    fun cleanSentMediaFiles(files: List<File>) {
+        viewModelScope.launch {
+            val cleaned = socialStatusRepository.cleanSentMedia(files)
+            showMessage("Cleaned $cleaned redundant sent files!")
+            sentMediaSummary.value = socialStatusRepository.scanSentMedia()
+            refreshStorage()
+        }
+    }
+
+    // ==========================================
+    // 11. SMART COLLECTIONS METHODS
+    // ==========================================
+
+    fun openSmartCollections() {
+        navigateToScreen(Screen.SMART_COLLECTIONS)
+        loadSmartCollections()
+    }
+
+    fun loadSmartCollections() {
+        viewModelScope.launch {
+            smartCollections.value = smartCollectionsRepository.getCollections()
+        }
+    }
+
+    fun openCollection(coll: SmartCollection) {
+        viewModelScope.launch {
+            isCollectionLoading.value = true
+            activeCollectionFiles.value = smartCollectionsRepository.loadCollectionFiles(coll)
+            isCollectionLoading.value = false
+        }
+    }
+
+    fun closeActiveCollection() {
+        activeCollectionFiles.value = null
+    }
+
+    fun createCustomCollection(title: String, description: String) {
+        viewModelScope.launch {
+            val created = smartCollectionsRepository.createCustomCollection(
+                title = title,
+                description = description,
+                colorHex = "#FF6700",
+                iconTag = "folder"
+            )
+            loadSmartCollections()
+            showMessage("Created collection \"${created.title}\"")
+        }
+    }
+
+    fun addFileToCollection(collectionId: String, filePath: String) {
+        viewModelScope.launch {
+            if (smartCollectionsRepository.addFileToCollection(collectionId, filePath)) {
+                showMessage("Added file to collection!")
+                loadSmartCollections()
+            } else {
+                showMessage("File is already in this collection")
+            }
+        }
+    }
+
+    fun removeFileFromCollection(collectionId: String, filePath: String) {
+        viewModelScope.launch {
+            if (smartCollectionsRepository.removeFileFromCollection(collectionId, filePath)) {
+                showMessage("Removed file from collection")
+                activeCollectionFiles.value?.let { curr ->
+                    activeCollectionFiles.value = smartCollectionsRepository.loadCollectionFiles(curr.collection)
+                }
+                loadSmartCollections()
+            }
+        }
+    }
+
+    // ==========================================
+    // 12. STORAGE TIME MACHINE METHODS
+    // ==========================================
+
+    fun openTimeMachine() {
+        navigateToScreen(Screen.TIME_MACHINE)
+        refreshTimeMachine()
+    }
+
+    fun refreshTimeMachine() {
+        viewModelScope.launch {
+            isTimeMachineLoading.value = true
+            timeMachineData.value = timeMachineRepository.analyzeTimeMachine()
+            isTimeMachineLoading.value = false
+        }
+    }
+
+    fun deleteFilesPermanently(files: List<File>) {
+        viewModelScope.launch {
+            var count = 0
+            for (f in files) {
+                if (f.delete()) count++
+            }
+            showMessage("Deleted $count file(s)")
+            refreshCurrentDirectory()
+            refreshStorage()
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         audioProgressJob?.cancel()
@@ -1917,6 +2162,7 @@ class ExplorerViewModel(application: Application) : AndroidViewModel(application
         mediaPlayer = null
         activeFtpServer?.stop()
         activeFtpServer = null
+        webShareServer.stop()
     }
 
     fun showMessage(msg: String) {
